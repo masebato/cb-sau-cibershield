@@ -77,12 +77,36 @@ components:
           items:
             $ref: '#/components/schemas/Asset'
 
-    ErrorResponse:
+    ProblemDetail:
       type: object
-      required: [error]
+      required: [type, title, status, detail]
       properties:
-        error:
+        type:
           type: string
+          format: uri
+          example: https://httpstatuses.com/404
+        title:
+          type: string
+          example: Not Found
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+          example: Usuario no encontrado
+        transactionId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          description: Detalle de errores de validación (solo en 400/422)
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              message:
+                type: string
 
 security:
   - m2mAuth: []
@@ -115,9 +139,9 @@ paths:
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   # ── Auth ───────────────────────────────────────────────────────────────────
 
@@ -160,17 +184,23 @@ paths:
                       user:
                         $ref: '#/components/schemas/UserProfile'
         '400':
-          description: Datos inválidos o email ya registrado
+          description: Datos inválidos
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Email ya registrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   /api/auth/login:
     post:
@@ -200,23 +230,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccessTokenResponse'
         '400':
-          description: Credenciales malformadas
+          description: Body malformado
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
         '401':
           description: Credenciales inválidas
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   /api/auth/logout:
     post:
@@ -246,17 +276,23 @@ paths:
                     type: string
                     example: Sesión cerrada correctamente
         '401':
-          description: No autorizado
+          description: M2M token ausente o inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Refresh token no encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   /api/auth/password-reset:
     post:
@@ -278,7 +314,7 @@ paths:
                   format: email
       responses:
         '200':
-          description: Email de recuperación enviado
+          description: Solicitud procesada
           content:
             application/json:
               schema:
@@ -288,17 +324,17 @@ paths:
                     type: string
                     example: Si el correo existe, recibirá instrucciones de recuperación
         '400':
-          description: Email inválido
+          description: Email malformado
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   # ── Profile ────────────────────────────────────────────────────────────────
 
@@ -315,17 +351,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfile'
         '401':
-          description: Token inválido o expirado
+          description: M2M token ausente o inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Usuario no encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
     put:
       tags: [Profile]
@@ -350,17 +392,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfile'
         '401':
-          description: No autorizado
+          description: M2M token ausente o inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Sin permisos para actualizar el perfil
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Usuario no encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   # ── Assets ─────────────────────────────────────────────────────────────────
 
@@ -393,21 +447,33 @@ paths:
         '400':
           description: Tipo o valor inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
         '401':
-          description: No autorizado
+          description: M2M token ausente o inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Usuario no encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Activo ya registrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
 
   /api/auth/assets/{id}:
     delete:
@@ -433,14 +499,26 @@ paths:
                     type: string
                     example: Activo eliminado correctamente
         '401':
-          description: No autorizado
+          description: M2M token ausente o inválido
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: El activo no pertenece a la empresa del usuario
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Activo no encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           description: Error interno
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'

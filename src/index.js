@@ -1,17 +1,17 @@
 'use strict';
 
-const server = require('@masebato/apix');
+const server               = require('@masebato/apix');
+const { createM2MHandler } = require('@masebato/apix');
+const config               = require('./config');
 
 server.openapi     = './src/openapi/openapi.yml';
 server.controllers = './src/controllers/index.js';
 
+const _m2mBase = createM2MHandler({ secret: config.m2mSecret, issuer: 'cibershield-gateway' });
+
 server.securityHandlers = {
   m2mAuth: async (req, scopes, schema) => {
-    const { verifyM2MToken } = require('./providers/m2m');
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) throw new Error('M2M token requerido');
-    verifyM2MToken(token);
-    // El gateway pasa el contexto del usuario como headers
+    await _m2mBase(req, scopes, schema); // valida y setea req.m2m
     req.caller = {
       userId:    req.headers['x-user-id']    ? Number(req.headers['x-user-id'])    : null,
       companyId: req.headers['x-company-id'] ? Number(req.headers['x-company-id']) : null,
@@ -29,7 +29,10 @@ server.onShutdown = async () => {
   console.log('CB-SAU shutting down');
 };
 
-server.onError = async (err, req, res) => {
+server.onError = async (err) => {
+  // Transforma errores de DB u otros errores de dominio sin status
+  // AppError ya trae .status, apix lo lee automáticamente
+  // Solo necesitamos mapear errores inesperados de terceros aquí
   return err;
 };
 
