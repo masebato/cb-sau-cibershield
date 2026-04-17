@@ -2,17 +2,34 @@
 
 Microservicio de autenticación de CiberShield Colombia. Gestiona registro, login JWT, perfil de empresa y activos digitales.
 
+> **Este servicio no es público.** Solo acepta requests del API Gateway (`cibershield`) autenticadas con un token M2M.
+
 ## Stack
 
 - **Node.js** >= 20
 - **Framework**: `@masebato/apix` (Express + OpenAPI validation)
-- **Auth**: JWT (access token 15 min + refresh token 7 días)
+- **Auth interna**: JWT M2M firmado por el gateway (secreto compartido)
+- **Auth de usuario**: JWT (access token 15 min + refresh token 7 días)
 - **DB**: PostgreSQL 16
+
+## Arquitectura de comunicación
+
+```
+Usuario → [JWT usuario] → cibershield (gateway)
+                               ↓ valida JWT usuario
+                               ↓ firma M2M token (TTL 1 min)
+                               ↓ headers: x-user-id, x-company-id, x-user-role
+          [M2M token]  →  cb-sau-cibershield
+                               ↓ verifica M2M token con M2M_SECRET
+                               ↓ ejecuta lógica con req.caller
+```
+
+El SAU nunca valida JWTs de usuario directamente. El contexto del usuario llega como headers inyectados por el gateway tras su propia validación.
 
 ## Endpoints
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
+| Método | Ruta | M2M | Descripción |
+|--------|------|-----|-------------|
 | GET | `/health` | No | Estado del servicio |
 | POST | `/api/auth/register` | No | Registro de empresa |
 | POST | `/api/auth/login` | No | Login → tokens JWT |
@@ -37,14 +54,17 @@ Variables requeridas:
 | Variable | Default | Descripción |
 |----------|---------|-------------|
 | `PORT` | `3001` | Puerto del servicio |
-| `JWT_SECRET` | — | Secreto para firmar tokens |
+| `M2M_SECRET` | — | **Secreto compartido con el gateway** |
+| `JWT_SECRET` | — | Secreto para firmar tokens de usuario |
 | `JWT_EXPIRES_IN` | `15m` | Duración access token |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` | Duración refresh token |
 | `DB_HOST` | `localhost` | Host PostgreSQL |
-| `DB_PORT` | `5432` | Puerto PostgreSQL |
+| `DB_PORT` | `5433` | Puerto PostgreSQL (Docker) |
 | `DB_NAME` | `cibershield_sau` | Nombre de la base de datos |
 | `DB_USER` | `postgres` | Usuario PostgreSQL |
 | `DB_PASSWORD` | — | Contraseña PostgreSQL |
+
+> `M2M_SECRET` debe ser idéntico en `cibershield` (gateway) y en este servicio.
 
 ## Desarrollo
 
@@ -84,6 +104,7 @@ src/
 │   ├── profile.service.js
 │   └── assets.service.js
 └── providers/            # Adaptadores externos
-    ├── jwt.js            # sign / verify tokens
+    ├── m2m.js            # Verificación del token M2M del gateway
+    ├── jwt.js            # sign / verify tokens de usuario
     └── db.js             # Conexión a PostgreSQL
 ```
