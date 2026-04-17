@@ -1,0 +1,445 @@
+openapi: 3.0.3
+
+info:
+  title: CB-SAU — Sistema de Autenticación de Usuarios
+  version: 1.0.0
+  description: >
+    Microservicio SAU de CiberShield Colombia.
+    Gestiona registro, autenticación JWT, perfil de empresa y activos digitales.
+
+servers:
+  - url: http://localhost:3001
+
+tags:
+  - name: Health
+    description: Estado del servicio
+  - name: Auth
+    description: Registro, login y recuperación de contraseña
+  - name: Profile
+    description: Perfil de usuario y empresa
+  - name: Assets
+    description: Gestión de activos digitales (IP, CIDR, dominio, subdominio)
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    AccessTokenResponse:
+      type: object
+      required: [access_token, refresh_token]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+
+    Asset:
+      type: object
+      required: [id, type, value, created_at]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [ip, cidr, domain, subdomain]
+        value:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      required: [id, email, role, company_id, company_name, assets]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+        company_id:
+          type: integer
+        company_name:
+          type: string
+        sector:
+          type: string
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ── Health ─────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Estado del servicio SAU
+      operationId: sau.health
+      security: []
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [service, status]
+                properties:
+                  service:
+                    type: string
+                    example: sau
+                  status:
+                    type: string
+                    example: ok
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Auth ───────────────────────────────────────────────────────────────────
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registro de nuevo usuario
+      description: Crea una cuenta de empresa. Endpoint público.
+      operationId: auth.register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, company_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                company_name:
+                  type: string
+                sector:
+                  type: string
+      responses:
+        '200':
+          description: Registro exitoso
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AccessTokenResponse'
+                  - type: object
+                    required: [user]
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Datos inválidos o email ya registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Inicio de sesión
+      description: Autentica credenciales y retorna tokens JWT. Endpoint público.
+      operationId: auth.login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          description: Credenciales malformadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cierre de sesión
+      description: Invalida el refresh token del usuario.
+      operationId: auth.logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Sesión cerrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Sesión cerrada correctamente
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/password-reset:
+    post:
+      tags: [Auth]
+      summary: Solicitar restablecimiento de contraseña
+      description: Envía un email con enlace de recuperación. Endpoint público.
+      operationId: auth.passwordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Email de recuperación enviado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Si el correo existe, recibirá instrucciones de recuperación
+        '400':
+          description: Email inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Profile ────────────────────────────────────────────────────────────────
+
+  /api/auth/profile:
+    get:
+      tags: [Profile]
+      summary: Obtener perfil del usuario autenticado
+      operationId: auth.profile.get
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Profile]
+      summary: Actualizar perfil de empresa
+      operationId: auth.profile.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                company_name:
+                  type: string
+                sector:
+                  type: string
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Assets ─────────────────────────────────────────────────────────────────
+
+  /api/auth/assets:
+    post:
+      tags: [Assets]
+      summary: Registrar activo
+      description: Agrega un activo (IP, CIDR, dominio, subdominio) a la empresa del usuario.
+      operationId: auth.assets.create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, value]
+              properties:
+                type:
+                  type: string
+                  enum: [ip, cidr, domain, subdomain]
+                value:
+                  type: string
+      responses:
+        '200':
+          description: Activo registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          description: Tipo o valor inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/assets/{id}:
+    delete:
+      tags: [Assets]
+      summary: Eliminar activo
+      operationId: auth.assets.delete
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID del activo
+      responses:
+        '200':
+          description: Activo eliminado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Activo eliminado correctamente
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
