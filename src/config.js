@@ -4,6 +4,7 @@ module.exports = {
   port:               process.env.PORT              || 3001,
   corsOrigin:         process.env.CORS_ORIGIN        || '*',
   swaggerUrl:         '/docs',
+  m2mSecret:          process.env.M2M_SECRET         || 'changeme_m2m_secret',
   jwtSecret:          process.env.JWT_SECRET         || 'changeme_secret',
   jwtExpiresIn:       process.env.JWT_EXPIRES_IN     || '15m',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',

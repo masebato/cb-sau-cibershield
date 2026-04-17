@@ -6,11 +6,17 @@ server.openapi     = './src/openapi/openapi.yml';
 server.controllers = './src/controllers/index.js';
 
 server.securityHandlers = {
-  bearerAuth: async (req, scopes, schema) => {
-    const { verifyAccessToken } = require('./providers/jwt');
+  m2mAuth: async (req, scopes, schema) => {
+    const { verifyM2MToken } = require('./providers/m2m');
     const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) throw new Error('Token requerido');
-    req.user = verifyAccessToken(token);
+    if (!token) throw new Error('M2M token requerido');
+    verifyM2MToken(token);
+    // El gateway pasa el contexto del usuario como headers
+    req.caller = {
+      userId:    req.headers['x-user-id']    ? Number(req.headers['x-user-id'])    : null,
+      companyId: req.headers['x-company-id'] ? Number(req.headers['x-company-id']) : null,
+      role:      req.headers['x-user-role']  ?? null,
+    };
     return true;
   },
 };

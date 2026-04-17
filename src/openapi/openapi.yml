@@ -23,10 +23,11 @@ tags:
 components:
 
   securitySchemes:
-    bearerAuth:
+    m2mAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: Token M2M firmado por el API Gateway (cibershield)
 
   schemas:
 
@@ -84,7 +85,7 @@ components:
           type: string
 
 security:
-  - bearerAuth: []
+  - m2mAuth: []
 
 paths:
 
